@@ -494,6 +494,8 @@ async function getQuickRecommendation() {
 
     if (results.length === 0) {
         grid.innerHTML = '<div class="empty-state"><h3>No encontramos nada con esos filtros</h3><p>Intenta cambiar el género o la plataforma.</p></div>';
+    } else {
+        renderMovies(results, grid, false, false);
     }
 }
 

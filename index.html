@@ -46,9 +46,13 @@
 
     <!-- VISTA PRINCIPAL DE LA APP -->
     <div class="layout">
+        <div class="mobile-overlay" onclick="toggleSidebar()"></div>
         <!-- Sidebar Izquierda (Filtros) -->
         <aside class="sidebar left-sidebar">
-            <h3 class="sidebar-title">Filtros de Búsqueda</h3>
+            <div class="sidebar-header">
+                <h3 class="sidebar-title">Filtros de Búsqueda</h3>
+                <button class="close-sidebar" onclick="toggleSidebar()" title="Cerrar filtros">×</button>
+            </div>
 
             
             <div class="sidebar-controls">
