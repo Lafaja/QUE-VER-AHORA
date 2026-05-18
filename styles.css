@@ -835,7 +835,7 @@ select:focus { border-color: var(--accent); }
 /* Responsive */
 @media (max-width: 1400px) { .layout { grid-template-columns: 280px 1fr; } }
 @media (max-width: 1024px) {
-    .layout { grid-template-columns: 1fr; }
+    .layout, .layout.sidebar-hidden { grid-template-columns: 1fr; }
     
     .sidebar {
         position: fixed;
