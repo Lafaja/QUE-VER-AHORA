@@ -7,9 +7,20 @@ const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/w500';
 const isDemoMode = API_KEY === 'TU_API_KEY_AQUI' || API_KEY === '';
 
 // =========================================================================
-// ESTADO GLOBAL
+// FIREBASE & ESTADO GLOBAL
 // =========================================================================
-let usersDB = JSON.parse(localStorage.getItem('cinematch_users')) || [];
+const firebaseConfig = {
+  apiKey: "AIzaSyDvs0gWjFcuVGaY-N7dmHQBl1PylggNADg",
+  authDomain: "cinematch-f2e41.firebaseapp.com",
+  projectId: "cinematch-f2e41",
+  storageBucket: "cinematch-f2e41.firebasestorage.app",
+  messagingSenderId: "1077539465757",
+  appId: "1:1077539465757:web:01bf4917ea0c7c99ec74f4",
+  measurementId: "G-R1KR2ZBFZ7"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
 let currentUser = null; // null = Invitado
 let currentAuthMode = 'login';
 let genresMap = {};
@@ -136,36 +147,53 @@ function setAuthMode(mode) {
     }
 }
 
-function handleAuth(e) {
+async function handleAuth(e) {
     e.preventDefault();
     const emailVal = document.getElementById('auth-email').value.trim().toLowerCase();
     const passVal = document.getElementById('auth-password').value.trim();
     const nameVal = document.getElementById('auth-name') ? document.getElementById('auth-name').value.trim() : '';
     const errorDiv = document.getElementById('auth-error');
 
-    if (currentAuthMode === 'register') {
-        if (usersDB.find(u => u.email === emailVal)) {
-            errorDiv.textContent = 'El email ya está registrado.';
-            return;
-        }
-        const newUser = { 
-            email: emailVal, 
-            username: nameVal || emailVal.split('@')[0], 
-            password: passVal, 
-            seenMovies: [],
-            watchLater: [] 
-        };
-        usersDB.push(newUser);
-        saveDB();
-        loginUser(newUser);
-    } else {
-        // Encontrar por email, o por si acaso hay cuentas antiguas, por username (retrocompatibilidad)
-        const user = usersDB.find(u => (u.email === emailVal || u.username === emailVal) && u.password === passVal);
-        if (user) {
-            loginUser(user);
+    errorDiv.textContent = 'Conectando con la base de datos...';
+    errorDiv.style.color = 'var(--text-muted)';
+    
+    try {
+        const userRef = db.collection('users').doc(emailVal);
+        const doc = await userRef.get();
+
+        if (currentAuthMode === 'register') {
+            if (doc.exists) {
+                errorDiv.style.color = 'var(--danger)';
+                errorDiv.textContent = 'El email ya está registrado.';
+                return;
+            }
+            const newUser = { 
+                email: emailVal, 
+                username: nameVal || emailVal.split('@')[0], 
+                password: passVal, 
+                seenMovies: [],
+                watchLater: [] 
+            };
+            await userRef.set(newUser);
+            loginUser(newUser);
         } else {
-            errorDiv.textContent = 'Email o contraseña incorrectos.';
+            if (doc.exists) {
+                const userData = doc.data();
+                if (userData.password === passVal) {
+                    loginUser(userData);
+                } else {
+                    errorDiv.style.color = 'var(--danger)';
+                    errorDiv.textContent = 'Contraseña incorrecta.';
+                }
+            } else {
+                errorDiv.style.color = 'var(--danger)';
+                errorDiv.textContent = 'No existe una cuenta con este email.';
+            }
         }
+    } catch (err) {
+        errorDiv.style.color = 'var(--danger)';
+        errorDiv.textContent = 'Error de conexión. Inténtalo de nuevo.';
+        console.error(err);
     }
 }
 
@@ -191,12 +219,14 @@ function logout() {
     switchTab('explorar'); 
 }
 
-function saveDB() {
-    if (currentUser) {
-        const idx = usersDB.findIndex(u => (u.email && u.email === currentUser.email) || (!u.email && u.username === currentUser.username));
-        if (idx > -1) usersDB[idx] = currentUser;
+async function saveDB() {
+    if (currentUser && currentUser.email) {
+        try {
+            await db.collection('users').doc(currentUser.email).set(currentUser);
+        } catch (e) {
+            console.error("Error guardando en Firestore:", e);
+        }
     }
-    localStorage.setItem('cinematch_users', JSON.stringify(usersDB));
 }
 
 // =========================================================================
@@ -916,8 +946,14 @@ async function initApp() {
     // Comprobar si hay sesión activa persistente
     const activeIdentifier = localStorage.getItem('cinematch_active_user');
     if (activeIdentifier) {
-        const user = usersDB.find(u => u.email === activeIdentifier || u.username === activeIdentifier);
-        if (user) currentUser = user;
+        try {
+            const doc = await db.collection('users').doc(activeIdentifier).get();
+            if (doc.exists) {
+                currentUser = doc.data();
+            }
+        } catch (e) {
+            console.error("Error cargando sesión:", e);
+        }
     }
 
     renderHeader();
