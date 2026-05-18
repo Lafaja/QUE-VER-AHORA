@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CineMatch | Recomendador de Películas</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <div id="demo-banner">
+        ⚠️ MODO DEMO: Añade tu API Key de TMDB en el código para buscar películas reales.
+    </div>
+
+    <!-- MODAL DE AUTENTICACIÓN -->
+    <div id="auth-modal" class="modal-overlay">
+        <div class="auth-card">
+            <button class="close-modal" onclick="closeAuthModal()">×</button>
+            <h2>CineMatch</h2>
+            <p>Únete para guardar películas y recibir recomendaciones.</p>
+            
+            <div class="auth-toggle">
+                <button id="toggle-login" class="active" onclick="setAuthMode('login')">Entrar</button>
+                <button id="toggle-register" onclick="setAuthMode('register')">Crear Cuenta</button>
+            </div>
+
+            <form id="auth-form" onsubmit="handleAuth(event)">
+                <div class="form-group hidden" id="group-name">
+                    <label>Nombre visible</label>
+                    <input type="text" id="auth-name" placeholder="¿Cómo quieres que te llamemos?">
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="auth-email" required placeholder="tu@email.com">
+                </div>
+                <div class="form-group">
+                    <label>Contraseña</label>
+                    <input type="password" id="auth-password" required placeholder="••••••••">
+                </div>
+                <button type="submit" class="auth-btn" id="auth-submit-btn">Entrar</button>
+                <div class="auth-error" id="auth-error"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- VISTA PRINCIPAL DE LA APP -->
+    <div class="layout">
+        <!-- Sidebar Izquierda (Filtros) -->
+        <aside class="sidebar left-sidebar">
+            <h3 class="sidebar-title">Filtros de Búsqueda</h3>
+
+            
+            <div class="sidebar-controls">
+                <div class="form-group" style="margin-bottom: 15px; position: relative;">
+                    <label>Buscar</label>
+                    <input type="text" id="search-input" placeholder="Buscar por nombre..." onkeypress="if(event.key === 'Enter') applyFilters()" autocomplete="off">
+                    <div id="search-suggestions" class="suggestions-dropdown hidden"></div>
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label>Tipo</label>
+                    <div class="type-toggle">
+                        <button id="type-movie" class="type-btn active" onclick="toggleType('movie')">Películas</button>
+                        <button id="type-tv" class="type-btn" onclick="toggleType('tv')">Series</button>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label>Géneros</label>
+                    <div id="genre-container" class="genre-chips">
+                        <div class="loading-small">Cargando...</div>
+                    </div>
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label style="margin-bottom: 12px;">Plataforma</label>
+                    <div class="platform-logos" id="platform-logos">
+                        <button class="platform-btn active" data-id="" title="Todas las plataformas" style="width: 60px; font-size: 0.9rem; font-weight: 600;">Todas</button>
+                        <button class="platform-btn" data-id="8" title="Netflix">
+                            <img src="https://upload.wikimedia.org/wikipedia/commons/0/08/Netflix_2015_logo.svg" alt="Netflix">
+                        </button>
+                        <button class="platform-btn" data-id="384" title="HBO Max">
+                            <img src="https://upload.wikimedia.org/wikipedia/commons/c/ce/Max_logo.svg" alt="HBO Max">
+                        </button>
+                        <button class="platform-btn" data-id="119" title="Amazon Prime">
+                            <img src="https://upload.wikimedia.org/wikipedia/commons/1/11/Amazon_Prime_Video_logo.svg" alt="Prime Video">
+                        </button>
+                        <button class="platform-btn" data-id="337" title="Disney+">
+                            <img src="https://upload.wikimedia.org/wikipedia/commons/3/3e/Disney%2B_logo.svg" alt="Disney+">
+                        </button>
+                    </div>
+                </div>
+                
+                <button class="btn-primary" onclick="applyFilters()" style="width: 100%;">Aplicar Filtros</button>
+            </div>
+        </aside>
+
+        <!-- Contenido Principal -->
+        <main class="main-content">
+            <!-- Navegación por pestañas y Menú de Usuario -->
+            <nav class="top-nav">
+                <button class="sidebar-toggle" onclick="toggleSidebar()" title="Alternar menú lateral">☰</button>
+                <div class="tabs">
+                    <button class="tab-btn active" onclick="switchTab('estrenos')" id="btn-tab-estrenos">Estrenos</button>
+                    <button class="tab-btn" onclick="switchTab('que-ver')" id="btn-tab-que-ver">¿Qué ver ahora?</button>
+                    <button class="tab-btn" onclick="switchTab('explorar')" id="btn-tab-explorar">Explorar</button>
+                    <button class="tab-btn" onclick="switchTab('recomendaciones')" id="btn-tab-recomendaciones">Recomendaciones</button>
+                    <button class="tab-btn" onclick="switchTab('vistas')" id="btn-tab-vistas">Mi Lista</button>
+                </div>
+                <div class="user-menu" id="user-menu-container">
+                    <!-- El JS inyecta aquí "Iniciar Sesión" o "Hola, Usuario" -->
+                </div>
+            </nav>
+
+            <!-- PESTAÑA: ¿QUÉ VER AHORA? -->
+            <div id="tab-que-ver" class="hidden">
+                <header>
+                    <h1>¿Qué ver ahora?</h1>
+                    <p class="subtitle">Dinos qué te apetece y te recomendaremos 5 opciones ideales.</p>
+                </header>
+                
+                <div class="quick-filter-container">
+                    <div class="quick-filter-group">
+                        <label>Tipo</label>
+                        <select id="quick-type">
+                            <option value="movie">Películas</option>
+                            <option value="tv">Series</option>
+                        </select>
+                    </div>
+                    <div class="quick-filter-group">
+                        <label>Género</label>
+                        <select id="quick-genre">
+                            <option value="">Cualquier género</option>
+                            <!-- Se llena por JS -->
+                        </select>
+                    </div>
+                    <div class="quick-filter-group">
+                        <label>Plataforma</label>
+                        <select id="quick-platform">
+                            <option value="">Todas</option>
+                            <option value="8">Netflix</option>
+                            <option value="119">Prime Video</option>
+                            <option value="337">Disney+</option>
+                            <option value="350">Apple TV</option>
+                            <option value="15">Hulu</option>
+                        </select>
+                    </div>
+                    <button class="btn-primary" onclick="getQuickRecommendation()" id="btn-quick-recommend">Recomiéndame 5</button>
+                </div>
+
+                <div class="movies-grid" id="grid-que-ver"></div>
+            </div>
+
+            <!-- PESTAÑA: EXPLORAR -->
+            <div id="tab-explorar">
+                <header>
+                    <h1>Explorar Catálogo</h1>
+                    <p class="subtitle">Descubre el mejor contenido de todo el mundo. Inicia sesión para guardar tu progreso.</p>
+                </header>
+                <div class="movies-grid" id="grid-explorar"></div>
+            </div>
+
+            <!-- PESTAÑA: VISTAS (MI LISTA) -->
+            <div id="tab-vistas" class="hidden">
+                <header>
+                    <h1>Mi Lista</h1>
+                    <p class="subtitle">Tu historial de contenido visto y favorito.</p>
+                    <div class="controls">
+                        <button class="btn-primary" id="filter-all-seen" onclick="filterVistas('all')">Vistas</button>
+                        <button class="btn-primary" id="filter-liked" style="background: transparent; border-color: rgba(0,0,0,0.1); color: var(--text-light);" onclick="filterVistas('liked')">Favoritas</button>
+                        <button class="btn-primary" id="filter-later" style="background: transparent; border-color: rgba(0,0,0,0.1); color: var(--text-light);" onclick="filterVistas('later')">Ver más tarde</button>
+                    </div>
+                </header>
+                <div class="movies-grid" id="grid-vistas"></div>
+            </div>
+
+            <!-- PESTAÑA: RECOMENDACIONES -->
+            <div id="tab-recomendaciones" class="hidden">
+                <header>
+                    <h1>Para Ti</h1>
+                    <p class="subtitle">Selección exclusiva basada en tu historial.</p>
+                </header>
+                <div class="movies-grid" id="grid-recomendaciones"></div>
+            </div>
+            <!-- PESTAÑA: ESTRENOS -->
+            <div id="tab-estrenos" class="hidden">
+                <header>
+                    <h1>Top 10 por Género</h1>
+                    <p class="subtitle">Los estrenos más populares del último mes divididos por categorías.</p>
+                </header>
+                <div id="estrenos-rows-container">
+                    <!-- Filas cargadas dinámicamente -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="main.js"></script>
+</body>
+</html>
